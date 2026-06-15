@@ -2378,27 +2378,31 @@ function hapusSiswaDb(id){
 
 function exportDataSiswa(){
   if(!siswaDb.length){toast('Tidak ada data','warn');return;}
-  const h='No,NIS,NISN,Nama,Kelas,JK,Tempat Lahir,Tanggal Lahir,Alamat,HP Siswa,HP Ortu,Nama Ayah,Nama Ibu\n';
-  const r=siswaDb.map((s,i)=>`${i+1},"${s.nis||''}","${s.nisn||''}","${s.nama}","${s.kelas}","${s.jk||''}","${s.ttlKota||''}","${s.ttlTgl||''}","${s.alamat||''}","${s.hp||''}","${s.hpOrtu||''}","${s.ayah||''}","${s.ibu||''}"`).join('\n');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([h+r],{type:'text/csv;charset=utf-8;'})); a.download='data_siswa.csv'; a.click();
-  toast('CSV diunduh!');
+  const sep = ';';
+  const h = ['No','NIS','NISN','Nama','Kelas','JK','Tempat Lahir','Tanggal Lahir','Alamat','HP Siswa','HP Ortu','Nama Ayah','Nama Ibu'].join(sep) + '\n';
+  const r = siswaDb.map((s,i)=>[i+1,s.nis||'',s.nisn||'',s.nama,s.kelas,s.jk||'',s.ttlKota||'',s.ttlTgl||'',s.alamat||'',s.hp||'',s.hpOrtu||'',s.ayah||'',s.ibu||''].join(sep)).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\uFEFF'+h+r],{type:'text/csv;charset=utf-8;'})); a.download='data_siswa.csv'; a.click();
+  toast('CSV diunduh! Buka di Excel — setiap kolom sudah terpisah otomatis.');
 }
 
 function openImportModal(){ $('modal-import').classList.add('on'); }
 function closeImportModal(){ $('modal-import').classList.remove('on'); $('csv-preview').textContent=''; }
 
 function downloadTemplateCSV(){
-  const header='NIS,NISN,Nama,Kelas,JK,Tempat Lahir,Tanggal Lahir,Alamat,HP Siswa,HP Ortu,Nama Ayah,Nama Ibu\n';
-  const contoh=[
-    '001,1234567890,"Budi Santoso","X-1","L","Jakarta","2009-05-10","Jl. Merdeka No.1","08123456789","08129876543","Ahmad Santoso","Siti Rahayu"',
-    '002,1234567891,"Ani Rahayu","X-1","P","Bandung","2009-08-20","Jl. Sudirman No.5","08134567890","08138765432","Budi Rahayu","Dewi Lestari"',
-  ].join('\n');
-  const blob=new Blob([header+contoh],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='template_data_siswa.csv';
+  // Gunakan semicolon (;) sebagai separator agar Excel langsung terbaca per kolom
+  const sep = ';';
+  const header = ['NIS','NISN','Nama','Kelas','JK','Tempat Lahir','Tanggal Lahir','Alamat','HP Siswa','HP Ortu','Nama Ayah','Nama Ibu'].join(sep) + '\n';
+  const contoh = [
+    ['001','1234567890','Budi Santoso','X-1','L','Jakarta','2009-05-10','Jl. Merdeka No.1','08123456789','08129876543','Ahmad Santoso','Siti Rahayu'],
+    ['002','1234567891','Ani Rahayu','X-1','P','Bandung','2009-08-20','Jl. Sudirman No.5','08134567890','08138765432','Budi Rahayu','Dewi Lestari'],
+  ].map(r=>r.join(sep)).join('\n');
+  // BOM (\uFEFF) agar Excel langsung mengenali encoding UTF-8
+  const blob = new Blob(['\uFEFF' + header + contoh], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'template_data_siswa.csv';
   a.click();
-  toast('Template CSV diunduh! Buka di Excel/Google Sheets lalu isi datanya.');
+  toast('Template CSV diunduh! Buka di Excel — setiap kolom sudah terpisah otomatis.');
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -2411,14 +2415,37 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 });
 
+// Parser CSV yang mendukung quoted fields dan otomatis deteksi separator (; atau ,)
+function parseCSVLine(line, sep){
+  const result = [];
+  let cur = '', inQ = false;
+  for(let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if(ch === '"'){
+      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if(ch === sep && !inQ){
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function prosesImportCSV(){
   const fi=$('csv-file'); if(!fi?.files[0]){toast('Pilih file CSV dulu','warn');return;}
   const r=new FileReader();
   r.onload=e=>{
-    const lines=e.target.result.split('\n').filter(l=>l.trim()).slice(1);
+    const raw = e.target.result.replace(/^\uFEFF/,''); // hapus BOM jika ada
+    const lines=raw.split('\n').filter(l=>l.trim()).slice(1);
+    // Deteksi otomatis separator: jika header baris pertama pakai ; gunakan ;
+    const firstLine = raw.split('\n')[0] || '';
+    const sep = firstLine.includes(';') ? ';' : ',';
     let added=0,skip=0;
     lines.forEach(line=>{
-      const cols=line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+      const cols=parseCSVLine(line, sep);
       const[nis,nisn,nama,kelas,jk,ttlKota,ttlTgl,alamat,hp,hpOrtu,ayah,ibu]=cols;
       if(!nama||!kelas){skip++;return;}
       const dup=siswaDb.find(s=>(nis&&s.nis===nis)||(s.nama===nama&&s.kelas===kelas));
