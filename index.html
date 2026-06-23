@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>E-Rapor Informatika — Kurikulum Merdeka</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════
    DESIGN TOKENS
@@ -1194,7 +1195,8 @@ body.dark .setting-row{border-color:#334155;}
       <input type="text" id="ds-cari" placeholder="🔍 Cari nama / NIS..." oninput="renderDataSiswa()" style="max-width:220px">
       <input type="text" id="ds-kelas" placeholder="Filter kelas..." list="dl-kelas" style="max-width:160px" oninput="renderDataSiswa()" autocomplete="off">
       <button class="btn btn-primary btn-sm" onclick="openModalSiswa()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Tambah Siswa</button>
-      <button class="btn btn-info btn-sm" onclick="openImportModal()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import CSV</button>
+      <button class="btn btn-primary btn-sm" onclick="openModalMassal()" style="background:var(--purple);border-color:var(--purple)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>Input Massal</button>
+      <button class="btn btn-info btn-sm" onclick="openImportModal()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import Excel/CSV</button>
       <button class="btn btn-outline btn-sm" onclick="exportDataSiswa()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <div class="card">
@@ -1537,6 +1539,58 @@ body.dark .setting-row{border-color:#334155;}
   </div>
 </div>
 
+<!-- Modal: Input Massal Siswa -->
+<div class="modal-backdrop" id="modal-massal">
+  <div class="modal-box" style="max-width:900px;width:96%">
+    <div class="modal-title">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      Input Massal Siswa
+    </div>
+    <div class="banner banner-blue" style="margin-bottom:14px">
+      <div class="banner-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="banner-body">
+        <div class="banner-title">Cara cepat input banyak siswa</div>
+        <div style="font-size:11px;margin-top:4px;line-height:1.7">
+          Isi tabel langsung di bawah ini · Tekan <strong>Tab</strong> untuk pindah kolom, <strong>Enter</strong> untuk baris baru ·
+          Atau <strong>copy dari Excel/Sheets</strong> lalu paste ke kolom NIS baris pertama (urutan: NIS, Nama, Kelas, JK)
+        </div>
+      </div>
+    </div>
+    <!-- Paste zone -->
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="tambahBarisMassal(5)">+ 5 Baris</button>
+      <button class="btn btn-outline btn-sm" onclick="tambahBarisMassal(10)">+ 10 Baris</button>
+      <button class="btn btn-outline btn-sm" onclick="bersihkanMassal()" style="color:var(--red)">🗑 Kosongkan</button>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:auto" id="massal-counter">0 baris terisi</span>
+    </div>
+    <div style="overflow-x:auto;border:1.5px solid var(--gray-200);border-radius:10px">
+      <table style="width:100%;border-collapse:collapse;min-width:700px" id="tbl-massal">
+        <thead>
+          <tr style="background:linear-gradient(135deg,var(--brand),var(--brand-dark))">
+            <th style="width:36px;padding:9px 8px;color:#fff;font-size:10px;font-weight:700;text-align:center;border-right:1px solid rgba(255,255,255,.15)">#</th>
+            <th style="padding:9px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-right:1px solid rgba(255,255,255,.15);min-width:80px">NIS</th>
+            <th style="padding:9px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-right:1px solid rgba(255,255,255,.15);min-width:200px">Nama Lengkap <span style="opacity:.6">*</span></th>
+            <th style="padding:9px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-right:1px solid rgba(255,255,255,.15);min-width:100px">Kelas <span style="opacity:.6">*</span></th>
+            <th style="padding:9px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-right:1px solid rgba(255,255,255,.15);min-width:80px">L / P</th>
+            <th style="padding:9px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;min-width:140px">No. HP Siswa</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-massal"></tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--gray-400);margin-top:8px">
+      💡 Kolom <strong>Nama</strong> dan <strong>Kelas</strong> wajib diisi. Baris kosong otomatis dilewati.
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn btn-outline" onclick="closeModalMassal()">Batal</button>
+      <button class="btn btn-primary" onclick="simpanMassal()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Simpan Semua Siswa
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Roster Cell -->
 <div class="modal-backdrop" id="modal-roster">
   <div class="modal-box" style="max-width:340px">
@@ -1560,7 +1614,7 @@ body.dark .setting-row{border-color:#334155;}
     <div class="banner banner-blue" style="margin-bottom:14px">
       <div class="banner-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
       <div class="banner-body">
-        <div class="banner-title">Format Kolom CSV</div>
+        <div class="banner-title">Format Kolom</div>
         <div style="font-family:var(--mono);font-size:10px;background:rgba(37,99,235,.08);padding:8px 10px;border-radius:6px;margin-top:6px;line-height:2;color:var(--blue)">
           NIS · NISN · Nama · Kelas · JK · Tempat Lahir<br>Tgl Lahir · Alamat · HP Siswa · HP Ortu · Nama Ayah · Nama Ibu
         </div>
@@ -1570,13 +1624,13 @@ body.dark .setting-row{border-color:#334155;}
     <div style="margin-bottom:14px">
       <button class="btn btn-outline btn-sm" onclick="downloadTemplateCSV()">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download Template CSV Kosong
+        Download Template Excel Kosong
       </button>
-      <span style="font-size:11px;color:var(--gray-400);margin-left:8px">Buka di Excel/Sheets lalu isi datanya</span>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:8px">Isi langsung di Excel, setiap kolom sudah terpisah</span>
     </div>
     <div class="field" style="margin-bottom:14px">
-      <label>Pilih File CSV yang sudah diisi</label>
-      <input type="file" id="csv-file" accept=".csv" style="cursor:pointer;background:var(--gray-50);border:1.5px dashed var(--gray-300);border-radius:8px;padding:12px">
+      <label>Pilih File Excel/CSV yang sudah diisi</label>
+      <input type="file" id="csv-file" accept=".xlsx,.xls,.csv" style="cursor:pointer;background:var(--gray-50);border:1.5px dashed var(--gray-300);border-radius:8px;padding:12px">
     </div>
     <div id="csv-preview" style="font-size:12px;min-height:24px"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
@@ -2343,6 +2397,156 @@ function simpanSiswa(){
   toast(editSiswaId?'Data diupdate!':'Siswa ditambahkan!');
 }
 
+// ════════════════════════════════════════════
+// INPUT MASSAL SISWA
+// ════════════════════════════════════════════
+const MASSAL_ROWS_INIT = 10;
+
+function openModalMassal(){
+  $('modal-massal').classList.add('on');
+  const tbody = $('tbody-massal');
+  if(!tbody.children.length) renderBarisMassal(MASSAL_ROWS_INIT);
+  updateMassalCounter();
+}
+
+function closeModalMassal(){ $('modal-massal').classList.remove('on'); }
+
+function renderBarisMassal(n){
+  const tbody = $('tbody-massal');
+  const start = tbody.children.length;
+  for(let i = 0; i < n; i++){
+    const idx = start + i;
+    const tr = document.createElement('tr');
+    tr.id = 'mr' + idx;
+    tr.style.cssText = 'transition:background .15s';
+    tr.innerHTML = `
+      <td style="text-align:center;font-size:11px;color:var(--gray-400);font-family:var(--mono);padding:5px 8px;border-bottom:1px solid var(--gray-100);border-right:1px solid var(--gray-100);background:var(--gray-50)">${idx+1}</td>
+      <td style="padding:3px 4px;border-bottom:1px solid var(--gray-100);border-right:1px solid var(--gray-100)"><input type="text" class="m-cell" data-row="${idx}" data-col="nis" placeholder="001" style="width:100%;padding:6px 8px;border:none;background:transparent;font-family:var(--mono);font-size:12px" oninput="updateMassalCounter()" onpaste="handleMassalPaste(event,${idx})"></td>
+      <td style="padding:3px 4px;border-bottom:1px solid var(--gray-100);border-right:1px solid var(--gray-100)"><input type="text" class="m-cell" data-row="${idx}" data-col="nama" placeholder="Nama lengkap siswa" style="width:100%;padding:6px 8px;border:none;background:transparent;font-weight:600;font-size:13px" oninput="updateMassalCounter()"></td>
+      <td style="padding:3px 4px;border-bottom:1px solid var(--gray-100);border-right:1px solid var(--gray-100)"><input type="text" class="m-cell" data-row="${idx}" data-col="kelas" placeholder="X-1" list="dl-kelas" autocomplete="off" style="width:100%;padding:6px 8px;border:none;background:transparent;font-size:12px" oninput="updateMassalCounter()"></td>
+      <td style="padding:3px 4px;border-bottom:1px solid var(--gray-100);border-right:1px solid var(--gray-100)">
+        <select class="m-cell" data-row="${idx}" data-col="jk" style="width:100%;padding:6px 6px;border:none;background:transparent;font-size:12px;cursor:pointer">
+          <option value="L">L</option><option value="P">P</option>
+        </select>
+      </td>
+      <td style="padding:3px 4px;border-bottom:1px solid var(--gray-100)"><input type="text" class="m-cell" data-row="${idx}" data-col="hp" placeholder="08xx..." style="width:100%;padding:6px 8px;border:none;background:transparent;font-family:var(--mono);font-size:12px"></td>`;
+    tbody.appendChild(tr);
+  }
+  // Tab dari kolom terakhir baris terakhir → tambah baris baru
+  tbody.querySelectorAll('tr:last-child .m-cell').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if(e.key === 'Tab' && !e.shiftKey && !e.ctrlKey){
+        const cells = [...tbody.querySelectorAll('tr:last-child .m-cell')];
+        if(inp === cells[cells.length - 1]){
+          e.preventDefault();
+          tambahBarisMassal(5);
+          setTimeout(()=> tbody.querySelector('tr:last-child .m-cell')?.focus(), 30);
+        }
+      }
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const allInputs = [...tbody.querySelectorAll('.m-cell[data-col="nama"]')];
+        const cur = allInputs.findIndex(el => el === inp || el.closest('tr') === inp.closest('tr'));
+        const next = allInputs[cur + 1];
+        if(next) next.focus(); else tambahBarisMassal(5);
+      }
+    });
+  });
+}
+
+function tambahBarisMassal(n){
+  renderBarisMassal(n || 5);
+  updateMassalCounter();
+}
+
+function bersihkanMassal(){
+  if(!confirm('Kosongkan semua baris?')) return;
+  $('tbody-massal').innerHTML = '';
+  renderBarisMassal(MASSAL_ROWS_INIT);
+  updateMassalCounter();
+}
+
+function updateMassalCounter(){
+  const rows = [...$('tbody-massal').querySelectorAll('tr')];
+  const filled = rows.filter(tr => {
+    const nama = tr.querySelector('[data-col="nama"]')?.value?.trim();
+    const kelas = tr.querySelector('[data-col="kelas"]')?.value?.trim();
+    return nama && kelas;
+  }).length;
+  $('massal-counter').textContent = filled + ' baris terisi';
+}
+
+// Handle paste dari Excel/Sheets — paste ke sel NIS kolom pertama
+function handleMassalPaste(e, startRow){
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if(!text.includes('\t') && !text.includes('\n')) return; // paste biasa, biarkan default
+  e.preventDefault();
+  const lines = text.trim().split('\n').map(l => l.split('\t').map(c => c.trim().replace(/\r/,'')));
+  const tbody = $('tbody-massal');
+  const allRows = [...tbody.querySelectorAll('tr')];
+  // Tambah baris jika kurang
+  const need = startRow + lines.length - allRows.length;
+  if(need > 0) renderBarisMassal(need + 2);
+  const freshRows = [...tbody.querySelectorAll('tr')];
+  const COLS = ['nis','nama','kelas','jk','hp'];
+  lines.forEach((cols, li) => {
+    const tr = freshRows[startRow + li];
+    if(!tr) return;
+    cols.forEach((val, ci) => {
+      if(ci >= COLS.length) return;
+      const cell = tr.querySelector(`[data-col="${COLS[ci]}"]`);
+      if(!cell) return;
+      if(cell.tagName === 'SELECT'){
+        const v = val.toUpperCase();
+        cell.value = (v === 'P') ? 'P' : 'L';
+      } else {
+        cell.value = val;
+      }
+      // highlight
+      tr.style.background = 'var(--brand-pale)';
+      setTimeout(()=> tr.style.background = '', 1200);
+    });
+  });
+  updateMassalCounter();
+  // Focus ke baris berikutnya
+  const nextRow = freshRows[startRow + lines.length];
+  if(nextRow) nextRow.querySelector('[data-col="nama"]')?.focus();
+}
+
+function simpanMassal(){
+  const tbody = $('tbody-massal');
+  const rows = [...tbody.querySelectorAll('tr')];
+  let added = 0, skip = 0, dupCount = 0;
+  rows.forEach(tr => {
+    const nis   = tr.querySelector('[data-col="nis"]')?.value?.trim() || '';
+    const nama  = tr.querySelector('[data-col="nama"]')?.value?.trim() || '';
+    const kelas = tr.querySelector('[data-col="kelas"]')?.value?.trim() || '';
+    const jk    = tr.querySelector('[data-col="jk"]')?.value || 'L';
+    const hp    = tr.querySelector('[data-col="hp"]')?.value?.trim() || '';
+    if(!nama || !kelas){ if(nama || nis) skip++; return; }
+    // Cek duplikat
+    const dup = siswaDb.find(s => (nis && s.nis === nis) || (s.nama === nama && s.kelas === kelas));
+    if(dup){ dupCount++; return; }
+    siswaDb.push({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      nis, nisn:'', nama, kelas, jk,
+      ttlKota:'', ttlTgl:'', alamat:'', hp,
+      hpOrtu:'', ayah:'', ibu:'', catatan:'',
+      tglDaftar: new Date().toLocaleDateString('id-ID')
+    });
+    added++;
+  });
+  localStorage.setItem('km_siswa', JSON.stringify(siswaDb));
+  closeModalMassal();
+  renderDataSiswa(); updateKelasDatalist();
+  let msg = added + ' siswa disimpan';
+  if(dupCount) msg += ' · ' + dupCount + ' duplikat dilewati';
+  if(skip) msg += ' · ' + skip + ' baris tidak lengkap';
+  toast(msg, added ? 'ok' : 'warn');
+  // Reset tabel untuk sesi berikutnya
+  $('tbody-massal').innerHTML = '';
+}
+
 function renderDataSiswa(){
   const cari=($('ds-cari')?.value||'').toLowerCase(), fkelas=($('ds-kelas')?.value||'').trim();
   let data=siswaDb.filter(s=>(s.nama.toLowerCase().includes(cari)||(s.nis||'').toLowerCase().includes(cari))&&(!fkelas||s.kelas===fkelas)).sort((a,b)=>a.kelas.localeCompare(b.kelas)||a.nama.localeCompare(b.nama));
@@ -2389,29 +2593,49 @@ function openImportModal(){ $('modal-import').classList.add('on'); }
 function closeImportModal(){ $('modal-import').classList.remove('on'); $('csv-preview').textContent=''; }
 
 function downloadTemplateCSV(){
-  // Gunakan semicolon (;) sebagai separator agar Excel langsung terbaca per kolom
-  const sep = ';';
-  const header = ['NIS','NISN','Nama','Kelas','JK','Tempat Lahir','Tanggal Lahir','Alamat','HP Siswa','HP Ortu','Nama Ayah','Nama Ibu'].join(sep) + '\n';
+  // Generate file Excel (.xlsx) ASLI — setiap data otomatis masuk ke kolom terpisah,
+  // tidak bergantung pada separator (,/;) sehingga tidak ada lagi masalah "1 kolom isi semua data".
+  const header = ['NIS','NISN','Nama','Kelas','JK','Tempat Lahir','Tanggal Lahir','Alamat','HP Siswa','HP Ortu','Nama Ayah','Nama Ibu'];
   const contoh = [
     ['001','1234567890','Budi Santoso','X-1','L','Jakarta','2009-05-10','Jl. Merdeka No.1','08123456789','08129876543','Ahmad Santoso','Siti Rahayu'],
     ['002','1234567891','Ani Rahayu','X-1','P','Bandung','2009-08-20','Jl. Sudirman No.5','08134567890','08138765432','Budi Rahayu','Dewi Lestari'],
-  ].map(r=>r.join(sep)).join('\n');
-  // BOM (\uFEFF) agar Excel langsung mengenali encoding UTF-8
-  const blob = new Blob(['\uFEFF' + header + contoh], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'template_data_siswa.csv';
-  a.click();
-  toast('Template CSV diunduh! Buka di Excel — setiap kolom sudah terpisah otomatis.');
+  ];
+  if(typeof XLSX === 'undefined'){
+    toast('Gagal memuat library Excel. Cek koneksi internet lalu coba lagi.', 'warn');
+    return;
+  }
+  const ws = XLSX.utils.aoa_to_sheet([header, ...contoh]);
+  // Atur lebar kolom agar nyaman dibaca/diisi
+  ws['!cols'] = [
+    {wch:8},{wch:14},{wch:22},{wch:10},{wch:6},{wch:14},{wch:14},{wch:26},{wch:15},{wch:15},{wch:20},{wch:20}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa');
+  XLSX.writeFile(wb, 'template_data_siswa.xlsx');
+  toast('Template Excel diunduh! Setiap data sudah berada di kolom terpisah.');
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   const fi=$('csv-file');
   if(fi)fi.addEventListener('change',()=>{
     const f=fi.files[0]; if(!f)return;
-    const r=new FileReader();
-    r.onload=e=>{ const lines=e.target.result.split('\n').filter(l=>l.trim()).slice(1); $('csv-preview').innerHTML=`<span style="color:var(--brand);font-weight:700">✓ ${lines.length} baris terdeteksi</span>`; };
-    r.readAsText(f);
+    const isExcel = /\.(xlsx|xls)$/i.test(f.name);
+    if(isExcel){
+      const r=new FileReader();
+      r.onload=e=>{
+        try{
+          const wb=XLSX.read(e.target.result,{type:'array'});
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+          const n=Math.max(rows.length-1,0);
+          $('csv-preview').innerHTML=`<span style="color:var(--brand);font-weight:700">✓ ${n} baris terdeteksi (Excel)</span>`;
+        }catch(err){ $('csv-preview').innerHTML='<span style="color:var(--red)">File Excel tidak terbaca</span>'; }
+      };
+      r.readAsArrayBuffer(f);
+    } else {
+      const r=new FileReader();
+      r.onload=e=>{ const lines=e.target.result.split('\n').filter(l=>l.trim()).slice(1); $('csv-preview').innerHTML=`<span style="color:var(--brand);font-weight:700">✓ ${lines.length} baris terdeteksi</span>`; };
+      r.readAsText(f);
+    }
   });
 });
 
@@ -2434,30 +2658,55 @@ function parseCSVLine(line, sep){
   return result;
 }
 
+function importBarisSiswa(rows){
+  // rows: array of arrays, baris pertama = header (dilewati)
+  let added=0,skip=0;
+  rows.slice(1).forEach(cols=>{
+    const[nis,nisn,nama,kelas,jk,ttlKota,ttlTglRaw,alamat,hp,hpOrtu,ayah,ibu]=cols.map(c=>String(c==null?'':c).trim());
+    if(!nama||!kelas){skip++;return;}
+    const dup=siswaDb.find(s=>(nis&&s.nis===nis)||(s.nama===nama&&s.kelas===kelas));
+    if(dup){skip++;return;}
+    // Tanggal dari Excel bisa berupa serial number; normalisasi ke YYYY-MM-DD jika perlu
+    let ttlTgl=ttlTglRaw;
+    if(/^\d+(\.\d+)?$/.test(ttlTgl) && ttlTgl){
+      const d=XLSX.SSF?.parse_date_code ? XLSX.SSF.parse_date_code(Number(ttlTgl)) : null;
+      if(d) ttlTgl=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    }
+    siswaDb.push({id:Date.now()+'_'+Math.random().toString(36).slice(2),nis:nis||'',nisn:nisn||'',nama,kelas,jk:jk||'L',ttlKota:ttlKota||'',ttlTgl:ttlTgl||'',alamat:alamat||'',hp:hp||'',hpOrtu:hpOrtu||'',ayah:ayah||'',ibu:ibu||'',tglDaftar:new Date().toLocaleDateString('id-ID')});
+    added++;
+  });
+  localStorage.setItem('km_siswa',JSON.stringify(siswaDb));
+  closeImportModal(); renderDataSiswa(); updateKelasDatalist();
+  toast(`${added} siswa diimport · ${skip} dilewati`);
+}
+
 function prosesImportCSV(){
-  const fi=$('csv-file'); if(!fi?.files[0]){toast('Pilih file CSV dulu','warn');return;}
-  const r=new FileReader();
-  r.onload=e=>{
-    const raw = e.target.result.replace(/^\uFEFF/,''); // hapus BOM jika ada
-    const lines=raw.split('\n').filter(l=>l.trim()).slice(1);
-    // Deteksi otomatis separator: jika header baris pertama pakai ; gunakan ;
-    const firstLine = raw.split('\n')[0] || '';
-    const sep = firstLine.includes(';') ? ';' : ',';
-    let added=0,skip=0;
-    lines.forEach(line=>{
-      const cols=parseCSVLine(line, sep);
-      const[nis,nisn,nama,kelas,jk,ttlKota,ttlTgl,alamat,hp,hpOrtu,ayah,ibu]=cols;
-      if(!nama||!kelas){skip++;return;}
-      const dup=siswaDb.find(s=>(nis&&s.nis===nis)||(s.nama===nama&&s.kelas===kelas));
-      if(dup){skip++;return;}
-      siswaDb.push({id:Date.now()+'_'+Math.random().toString(36).slice(2),nis:nis||'',nisn:nisn||'',nama,kelas,jk:jk||'L',ttlKota:ttlKota||'',ttlTgl:ttlTgl||'',alamat:alamat||'',hp:hp||'',hpOrtu:hpOrtu||'',ayah:ayah||'',ibu:ibu||'',tglDaftar:new Date().toLocaleDateString('id-ID')});
-      added++;
-    });
-    localStorage.setItem('km_siswa',JSON.stringify(siswaDb));
-    closeImportModal(); renderDataSiswa(); updateKelasDatalist();
-    toast(`${added} siswa diimport · ${skip} dilewati`);
-  };
-  r.readAsText(fi.files[0]);
+  const fi=$('csv-file'); if(!fi?.files[0]){toast('Pilih file dulu','warn');return;}
+  const f=fi.files[0];
+  const isExcel=/\.(xlsx|xls)$/i.test(f.name);
+  if(isExcel){
+    if(typeof XLSX==='undefined'){toast('Gagal memuat library Excel. Cek koneksi internet.','warn');return;}
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+        importBarisSiswa(rows);
+      }catch(err){ toast('Gagal membaca file Excel: '+err.message,'warn'); }
+    };
+    r.readAsArrayBuffer(f);
+  } else {
+    const r=new FileReader();
+    r.onload=e=>{
+      const raw=e.target.result.replace(/^\uFEFF/,'');
+      const lines=raw.split('\n').filter(l=>l.trim());
+      const firstLine=lines[0]||'';
+      const sep=firstLine.includes(';')?';':',';
+      const rows=lines.map(line=>parseCSVLine(line,sep));
+      importBarisSiswa(rows);
+    };
+    r.readAsText(f);
+  }
 }
 
 function updateKelasDatalist(){
